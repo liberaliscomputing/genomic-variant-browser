@@ -9,27 +9,53 @@ ui <- navbarPage(
         sidebarLayout(
             sidebarPanel(uiOutput("select"), width = 2),
             # mainPanel(DT::dataTableOutput("resources"), width = 10)
-            mainPanel(verbatimTextOutput("resources"), width = 10)
+            mainPanel(
+                tabsetPanel(
+                    type = "tabs",
+                    tabPanel("Demographics", verbatimTextOutput("demographics")),
+                    tabPanel("Diseases", verbatimTextOutput("diseases")),
+                    tabPanel("Variants", verbatimTextOutput("variants"))
+                )
+                
+            )
         )
     )
 )
 
 
-# Server component
+# server component
 server <- function(input, output) {
-    datatable_input <- reactive({
-        filtered_df = patient_df[patient_df$research_id == input$subject, ]
+    datat_input <- reactive({
+        base_url = trimws(fhir_api, which = "right", whitespace = "/")
+        patient_id = patient_df[patient_df$research_id == input$subject, ]$patient_id
+        results <- list()
 
-        patient_id = filtered_df$patient_id
+        # demographcs
+        demographics <- paste(
+            base_url,
+            glue("Patient/{patient_id}"),
+            sep="/"
+        )
+        demographics <- get_request(demographics, fhir_cookie)
+        results[["demographics"]] <- demographics
 
-        query_string <- paste(
-            trimws(fhir_api, which = "right", whitespace = "/"),
+        # diseases
+        diseases <- paste(
+            base_url,
+            glue("Condition?subject=Patient/{patient_id}"),
+            sep="/"
+        )
+        diseases <- paginate(diseases, fhir_cookie)
+        results["diseases"] <- diseases
+
+        # variants
+        variants <- paste(
+            base_url,
             glue("Observation?_profile:below=http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant&subject=Patient/{patient_id}"),
             sep="/"
         )
-        variants <- paginate(query_string, fhir_cookie)
-
-        results <- jsonlite::prettify(jsonlite::toJSON(variants, auto_unbox = TRUE), 2)
+        variants <- paginate(variants, fhir_cookie)
+        results["variants"] <- variants
 
         # return(variant_df[variant_df$research_id == input$subject, ])
         return(results)
@@ -48,8 +74,22 @@ server <- function(input, output) {
     #     datatable_input()
     # }, options = list(pageLength = 25))
 
-    output$resources <- renderText({
-        datatable_input()
+    output$demographics <- renderText({
+        jsonlite::prettify(
+            jsonlite::toJSON(datat_input()[["demographics"]], auto_unbox = TRUE), 2
+        )
+    })
+
+    output$diseases <- renderText({
+        jsonlite::prettify(
+            jsonlite::toJSON(datat_input()[["diseases"]], auto_unbox = TRUE), 2
+        )
+    })
+
+    output$variants <- renderText({
+        jsonlite::prettify(
+            jsonlite::toJSON(datat_input()[["variants"]], auto_unbox = TRUE), 2
+        )
     })
 }
 

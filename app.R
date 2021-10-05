@@ -8,12 +8,11 @@ ui <- navbarPage(
         "Genomics Report",
         sidebarLayout(
             sidebarPanel(uiOutput("select"), width = 2),
-            # mainPanel(DT::dataTableOutput("resources"), width = 10)
             mainPanel(
                 tabsetPanel(
                     type = "tabs",
-                    tabPanel("Demographics", verbatimTextOutput("demographics")),
-                    tabPanel("Diseases", verbatimTextOutput("diseases")),
+                    tabPanel("Demographics", DT::dataTableOutput("demographics")),
+                    tabPanel("Diseases", DT::dataTableOutput("diseases")),
                     tabPanel("Variants", verbatimTextOutput("variants"))
                 )
                 
@@ -25,7 +24,7 @@ ui <- navbarPage(
 
 # server component
 server <- function(input, output) {
-    datat_input <- reactive({
+    data_input <- reactive({
         base_url = trimws(fhir_api, which = "right", whitespace = "/")
         patient_id = patient_df[patient_df$research_id == input$subject, ]$patient_id
         results <- list()
@@ -37,6 +36,14 @@ server <- function(input, output) {
             sep="/"
         )
         demographics <- get_request(demographics, fhir_cookie)
+        extension = demographics$extension
+        demographics <- data.frame(
+            "Subject" = c(demographics$identifier[[1]]$value),
+            "Race" = c(extension[[1]]$extension[[2]]$valueCoding$display),
+            "Ethnicity" = c(extension[[2]]$extension[[2]]$valueCoding$display),
+            "Gender" = c(demographics$gender),
+            check.names = FALSE
+        )
         results[["demographics"]] <- demographics
 
         # diseases
@@ -46,6 +53,32 @@ server <- function(input, output) {
             sep="/"
         )
         diseases <- paginate(diseases, fhir_cookie)
+
+        subject <- c()
+        clinical_status <- c()
+        category <- c()
+        code <- c()
+        body_site <- c()
+        onset_age <- c()
+        for (disease in diseases) {
+            subject <- c(subject, input$subject)
+            clinical_status <- c(
+                clinical_status, disease$clinicalStatus$coding[[2]]$display
+            )
+            category <- c(category, disease$category[[2]]$coding[[1]]$display)
+            code <- c(code, disease$code$coding[[1]]$display)
+            body_site <- c(body_site, disease$bodySite[[1]]$coding[[1]]$display)
+            onset_age <- c(onset_age, disease$onsetAge$value)
+        }
+        diseases <- data.frame(
+            "Subject" = subject,
+            "Clinical Status" = clinical_status,
+            "Disease Category" = category,
+            "Dieases Code" = code,
+            "Body Site" = body_site,
+            "Onset Age in Days" = onset_age,
+            check.names = FALSE
+        )
         results[["diseases"]] <- diseases
 
         # variants
@@ -70,25 +103,17 @@ server <- function(input, output) {
         )
     })
 
-    # output$resources <- DT::renderDataTable({
-    #     datatable_input()
-    # }, options = list(pageLength = 25))
+    output$demographics <- DT::renderDataTable({
+        data_input()[["demographics"]]
+    }, options = list(pageLength = 25))
 
-    output$demographics <- renderText({
-        jsonlite::prettify(
-            jsonlite::toJSON(datat_input()[["demographics"]], auto_unbox = TRUE), 2
-        )
-    })
-
-    output$diseases <- renderText({
-        jsonlite::prettify(
-            jsonlite::toJSON(datat_input()[["diseases"]], auto_unbox = TRUE), 2
-        )
-    })
+    output$diseases <- DT::renderDataTable({
+        data_input()[["diseases"]]
+    }, options = list(pageLength = 25))
 
     output$variants <- renderText({
         jsonlite::prettify(
-            jsonlite::toJSON(datat_input()[["variants"]], auto_unbox = TRUE), 2
+            jsonlite::toJSON(data_input()[["variants"]], auto_unbox = TRUE), 2
         )
     })
 }

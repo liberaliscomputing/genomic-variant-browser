@@ -46,7 +46,7 @@ server <- function(input, output) {
             sep="/"
         )
         diseases <- paginate(diseases, fhir_cookie)
-        results["diseases"] <- diseases
+        results[["diseases"]] <- diseases
 
         # variants
         variants <- paste(
@@ -55,7 +55,7 @@ server <- function(input, output) {
             sep="/"
         )
         variants <- paginate(variants, fhir_cookie)
-        results["variants"] <- variants
+        results[["variants"]] <- variants
 
         # return(variant_df[variant_df$research_id == input$subject, ])
         return(results)

@@ -51,7 +51,7 @@ FHIR_COOKIE=<your-cookie>
 4. Build a Docker image and run a container as follows.
 
 ```
-$ docker build -t genomic-variant-browser . && docker run --rm -it genomic-variant-browser
+$ docker build -t genomic-variant-browser . && docker run --rm -it -p 3838:3838 genomic-variant-browser
 ```
 
 5. If run successfully, an R Shiny web application rendering the genomic variant resources is available at http://localhost:3838.
